@@ -22,7 +22,7 @@
 #include "freertos/queue.h"
 
 #include "esp_heap_caps.h"
-#include "anim.h"
+#include "anim_16x16.h"
 #include "val2pwm.h"
 #include "i2s_parallel.h"
 
@@ -91,8 +91,8 @@ Note: Because every subframe contains one bit of grayscale information, they are
 //a bitplane count of 7, you should be able to reproduce an 16-bit image more or less faithfully, though.
 #define BITPLANE_CNT 7
 
-//64*32 RGB leds, 2 pixels per 16-bit value...
-#define BITPLANE_SZ (64*32/2)
+//16*16 RGB leds, 2 pixels per 16-bit value...
+#define BITPLANE_SZ (16*16/2)
 
 //Upper half RGB
 #define BIT_R1 (1<<0)   //connected to GPIO2 here
@@ -103,10 +103,10 @@ Note: Because every subframe contains one bit of grayscale information, they are
 #define BIT_G2 (1<<4)   //connected to GPIO27 here
 #define BIT_B2 (1<<5)   //connected to GPIO17 here
 
-#define BIT_A (1<<8)    //connected to GPIO5 here
-#define BIT_B (1<<9)    //connected to GPIO18 here
-#define BIT_C (1<<10)   //connected to GPIO19 here
-#define BIT_D (1<<11)   //connected to GPIO21 here
+// #define BIT_A (1<<8)    //connected to GPIO5 here
+// #define BIT_B (1<<9)    //connected to GPIO18 here
+// #define BIT_C (1<<10)   //connected to GPIO19 here
+// #define BIT_D (1<<11)   //connected to GPIO21 here
 #define BIT_LAT (1<<12) //connected to GPIO26 here
 #define BIT_OE (1<<13)  //connected to GPIO25 here
 
@@ -114,7 +114,7 @@ Note: Because every subframe contains one bit of grayscale information, they are
 //Get a pixel from the image at pix, assuming the image is a 64x32 8R8G8B image
 //Returns it as an uint32 with the lower 24 bits containing the RGB values.
 static uint32_t getpixel(unsigned char *pix, int x, int y) {
-    unsigned char *p=pix+((x+y*64)*3);
+    unsigned char *p=pix+((x+y*16)*3);
     return (p[0]<<16)|(p[1]<<8)|(p[2]);
 }
 
@@ -125,8 +125,8 @@ void app_main()
     
     i2s_parallel_buffer_desc_t bufdesc[2][1<<BITPLANE_CNT];
     i2s_parallel_config_t cfg={
-        .gpio_bus={2, 15, 4, 16, 27, 17, -1, -1, 5, 18, 19, 21, 26, 25, -1, -1},
-        .gpio_clk=22,
+        .gpio_bus={25, 26, 27, 14, 12, 13, -1, -1, -1, -1, -1, -1, 4, 15, -1, -1},
+        .gpio_clk=16,
         .bits=I2S_PARALLEL_BITS_16,
         .clkspeed_hz=20*1000*1000,
         .bufa=bufdesc[0],
@@ -177,62 +177,87 @@ void app_main()
     gpio_set_direction(0, GPIO_MODE_DEF_INPUT);
     gpio_pullup_en(0);
     
-    int apos=0; //which frame in the animation we're on
+    //  printf("R G B | R G B | ..\n");
+    // for(int i= 0; i < 16; i++){
+    //     for(int j= 0; j < 16*3; j+=3){
+    //         printf("%d ",anim[(i*16)+j]);
+    //         printf("%d ",anim[(i*16)+j+1]);
+    //         printf("%d | ",anim[(i*16)+j+2]);
+    //     }
+    //     printf("\n");
+    // }
+
+    // printf("%u\n",getpixel(anim, 0, 0));  
+    // printf("%u\n",getpixel(anim, 0, 1));
+    // printf("%u\n",getpixel(anim, 1, 1));
+
+
+    // vTaskDelay(10000 / portTICK_PERIOD_MS); //animation has an 100ms interval
+
+
+    // printf("===================== 1 \n");
+
+    // int apos=0; //which frame in the animation we're on
     int backbuf_id=0; //which buffer is the backbuffer, as in, which one is not active so we can write to it
     while(1) {
         //Fill bitplanes with the data for the current image
-        const uint8_t *pix=&anim[apos*64*32*3];     //pixel data for this animation frame
+        const uint8_t *pix=&anim[0];     //pixel data for this animation frame
         for (int pl=0; pl<BITPLANE_CNT; pl++) {
+
             int mask=(1<<(8-BITPLANE_CNT+pl)); //bitmask for pixel data in input for this bitplane
             uint16_t *p=bitplane[backbuf_id][pl]; //bitplane location to write to
-            for (unsigned int y=0; y<16; y++) {
-                int lbits=0;                //Precalculate line bits of the *previous* line, which is the one we're displaying now
-                if ((y-1)&1) lbits|=BIT_A;
-                if ((y-1)&2) lbits|=BIT_B;
-                if ((y-1)&4) lbits|=BIT_C;
-                if ((y-1)&8) lbits|=BIT_D;
-                for (int fx=0; fx<64; fx++) {
+            for (unsigned int y=0; y<8; y++) {
+                for (int fx=0; fx<16; fx++) {
 #if DISPLAY_ROWS_SWAPPED
                     int x=fx^1; //to correct for the fact that the stupid LED screen I have has each row swapped...
 #else
                     int x=fx;
 #endif
 
-                    int v=lbits;
+                    int v=0;
                     //Do not show image while the line bits are changing
                     if (fx<1 || fx>=brightness) v|=BIT_OE;
-                    if (fx==62) v|=BIT_LAT; //latch on second-to-last bit... why not last bit? Dunno, probably a timing thing.
+                    // if (fx==14) v|=BIT_LAT; //latch on second-to-last bit... why not last bit? Dunno, probably a timing thing.
 
                     int c1, c2;
                     c1=getpixel(pix, x, y);
-                    c2=getpixel(pix, x, y+16);
+                    c2=getpixel(pix, x, y+8);
+
+                    if (c1 != 0){
+                        printf("Holaaa c1 %d \n", c1);
+                    }
+                    if (c2 != 0){
+                        printf("Holaaa c2 %d \n", c2);
+                    }
+
                     if (c1 & (mask<<16)) v|=BIT_R1;
                     if (c1 & (mask<<8)) v|=BIT_G1;
                     if (c1 & (mask<<0)) v|=BIT_B1;
                     if (c2 & (mask<<16)) v|=BIT_R2;
                     if (c2 & (mask<<8)) v|=BIT_G2;
                     if (c2 & (mask<<0)) v|=BIT_B2;
-
+                    
+                    // Red upper
+                    // v |=1;
+                    // Green lower
+                    // v |=16;
                     //Save the calculated value to the bitplane memory
+                    if(x == 15 && y == 7){
+                        v|=BIT_LAT;
+                    }
                     *p++=v;
                 }
             }
+
         }
 
         //Show our work!
+        printf("Show our work!\n");
         i2s_parallel_flip_to_buffer(&I2S1, backbuf_id);
         backbuf_id^=1;
         //Bitplanes are updated, new image shows now.
         vTaskDelay(100 / portTICK_PERIOD_MS); //animation has an 100ms interval
 
-        if (gpio_get_level(0)) {
-            //show next frame of Nyancat animation
-            apos++;
-            if (apos>=12) apos=0;
-        } else {
-            //show Lena
-            apos=12;
-        }
     }
 }
 

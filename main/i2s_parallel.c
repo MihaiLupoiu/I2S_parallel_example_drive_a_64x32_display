@@ -28,7 +28,7 @@
 #include "soc/io_mux_reg.h"
 #include "rom/lldesc.h"
 #include "esp_heap_caps.h"
-#include "anim.h"
+#include "anim_16x16.h"
 #include "val2pwm.h"
 #include "i2s_parallel.h"
 
