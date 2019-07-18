@@ -95,20 +95,20 @@ Note: Because every subframe contains one bit of grayscale information, they are
 #define BITPLANE_SZ (16*16/2)
 
 //Upper half RGB
-#define BIT_R1 (1<<0)   //connected to GPIO2 here
-#define BIT_G1 (1<<1)   //connected to GPIO15 here
-#define BIT_B1 (1<<2)   //connected to GPIO4 here
+#define BIT_R1 (1<<0)   //connected to GPIO25 here
+#define BIT_G1 (1<<1)   //connected to GPIO26 here
+#define BIT_B1 (1<<2)   //connected to GPIO27 here
 //Lower half RGB
-#define BIT_R2 (1<<3)   //connected to GPIO16 here
-#define BIT_G2 (1<<4)   //connected to GPIO27 here
-#define BIT_B2 (1<<5)   //connected to GPIO17 here
+#define BIT_R2 (1<<3)   //connected to GPIO14 here
+#define BIT_G2 (1<<4)   //connected to GPIO12 here
+#define BIT_B2 (1<<5)   //connected to GPIO13 here
 
 // #define BIT_A (1<<8)    //connected to GPIO5 here
 // #define BIT_B (1<<9)    //connected to GPIO18 here
 // #define BIT_C (1<<10)   //connected to GPIO19 here
 // #define BIT_D (1<<11)   //connected to GPIO21 here
-#define BIT_LAT (1<<12) //connected to GPIO26 here
-#define BIT_OE (1<<13)  //connected to GPIO25 here
+#define BIT_LAT (1<<12) //connected to GPIO4 here
+#define BIT_OE (1<<13)  //connected to GPIO15 here
 
 
 //Get a pixel from the image at pix, assuming the image is a 64x32 8R8G8B image
@@ -124,9 +124,10 @@ void app_main()
                        //Warning when set too high: Do not look into LEDs with remaining eye.
     
     i2s_parallel_buffer_desc_t bufdesc[2][1<<BITPLANE_CNT];
+    // New GPIOs assigned. 
     i2s_parallel_config_t cfg={
         .gpio_bus={25, 26, 27, 14, 12, 13, -1, -1, -1, -1, -1, -1, 4, 15, -1, -1},
-        .gpio_clk=16,
+        .gpio_clk=16, // GPIO for sending clock (before GPIO22)
         .bits=I2S_PARALLEL_BITS_16,
         .clkspeed_hz=20*1000*1000,
         .bufa=bufdesc[0],
